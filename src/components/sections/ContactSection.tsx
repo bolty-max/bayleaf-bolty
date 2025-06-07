@@ -1,26 +1,86 @@
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-scroll';
-import { Phone, Mail, MapPin, Clock } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import gsap from 'gsap';
+import { useReservations } from '../../hooks/useReservations';
+import { useLanguage } from '../../context/LanguageContext';
+import { translations } from '../../context/translations';
 
 const ContactSection: React.FC = () => {
   const formRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
+  const { language } = useLanguage();
+  const { createReservation, loading } = useReservations();
   
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     date: '',
     time: '',
     guests: '2',
     message: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitStatus, setSubmitStatus] = useState<{
+    type: 'success' | 'error' | null;
+    message: string;
+  }>({ type: null, message: '' });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log('Form submitted:', formData);
+    setSubmitStatus({ type: null, message: '' });
+
+    try {
+      const reservationData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        date: formData.date,
+        time: formData.time,
+        guests: parseInt(formData.guests),
+        special_requests: formData.message || undefined,
+        status: 'pending' as const,
+      };
+
+      const { data, error } = await createReservation(reservationData);
+
+      if (error) {
+        setSubmitStatus({
+          type: 'error',
+          message: language === 'en' 
+            ? 'Failed to submit reservation. Please try again.' 
+            : 'Reservierung konnte nicht übermittelt werden. Bitte versuchen Sie es erneut.'
+        });
+        return;
+      }
+
+      setSubmitStatus({
+        type: 'success',
+        message: language === 'en'
+          ? 'Reservation submitted successfully! We will contact you soon to confirm.'
+          : 'Reservierung erfolgreich übermittelt! Wir werden Sie bald kontaktieren, um zu bestätigen.'
+      });
+
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        date: '',
+        time: '',
+        guests: '2',
+        message: ''
+      });
+
+    } catch (error) {
+      setSubmitStatus({
+        type: 'error',
+        message: language === 'en'
+          ? 'An unexpected error occurred. Please try again.'
+          : 'Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.'
+      });
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -33,22 +93,22 @@ const ContactSection: React.FC = () => {
   const contactInfo = [
     {
       icon: <MapPin size={20} />,
-      title: "Address",
+      title: translations.contact.info.address[language],
       content: "August-Ruf-Straße 16, 78224 Singen (Hohentwiel)"
     },
     {
       icon: <Phone size={20} />,
-      title: "Phone",
+      title: translations.contact.info.phone[language],
       content: "+49 179 423 2002"
     },
     {
       icon: <Mail size={20} />,
-      title: "Email",
+      title: translations.contact.info.email[language],
       content: "info@bay-leaf.eu"
     },
     {
       icon: <Clock size={20} />,
-      title: "Opening Hours",
+      title: translations.contact.info.hours[language],
       content: (
         <>
           Tue-Sun: 11:30 AM – 2:30 PM / 5:30 PM - 10:00 PM<br />
@@ -56,7 +116,6 @@ const ContactSection: React.FC = () => {
         </>
       )
     }
-    
   ];
 
   return (
@@ -82,9 +141,11 @@ const ContactSection: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <h2 className="font-display text-4xl md:text-5xl text-white font-bold text-center mb-4">Contact Us</h2>
+          <h2 className="font-display text-4xl md:text-5xl text-white font-bold text-center mb-4">
+            {translations.contact.title[language]}
+          </h2>
           <p className="text-white/80 text-lg md:text-xl max-w-2xl mx-auto text-center mb-12">
-            We'd love to hear from you! Make a reservation or send us your questions.
+            {translations.contact.subtitle[language]}
           </p>
         </motion.div>
         
@@ -96,52 +157,97 @@ const ContactSection: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="bg-white/95 backdrop-blur p-8 rounded-lg shadow-xl"
           >
-            <h3 className="font-display text-2xl mb-6 text-gray-900">Book a Table</h3>
+            <h3 className="font-display text-2xl mb-6 text-gray-900">
+              {translations.navbar.bookTable[language]}
+            </h3>
+            
+            {/* Status Message */}
+            {submitStatus.type && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+                  submitStatus.type === 'success' 
+                    ? 'bg-green-50 text-green-800 border border-green-200' 
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                }`}
+              >
+                {submitStatus.type === 'success' ? (
+                  <CheckCircle size={20} className="text-green-600" />
+                ) : (
+                  <AlertCircle size={20} className="text-red-600" />
+                )}
+                <span className="text-sm">{submitStatus.message}</span>
+              </motion.div>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="name" className="block text-gray-700 mb-1">Name</label>
+                  <label htmlFor="name" className="block text-gray-700 mb-1">
+                    {translations.contact.form.name[language]} *
+                  </label>
                   <input
                     type="text"
                     id="name"
                     value={formData.name}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-                    placeholder="Your name"
+                    placeholder={language === 'en' ? 'Your name' : 'Ihr Name'}
                     required
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="email" className="block text-gray-700 mb-1">Email</label>
+                  <label htmlFor="email" className="block text-gray-700 mb-1">
+                    {translations.contact.form.email[language]} *
+                  </label>
                   <input
                     type="email"
                     id="email"
                     value={formData.email}
                     onChange={handleChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-                    placeholder="Your email"
+                    placeholder={language === 'en' ? 'Your email' : 'Ihre E-Mail'}
                     required
                   />
                 </div>
               </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-gray-700 mb-1">
+                  {translations.contact.info.phone[language]}
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+                  placeholder={language === 'en' ? 'Your phone number' : 'Ihre Telefonnummer'}
+                />
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="date" className="block text-gray-700 mb-1">Date</label>
+                  <label htmlFor="date" className="block text-gray-700 mb-1">
+                    {translations.contact.form.date[language]} *
+                  </label>
                   <input
                     type="date"
                     id="date"
                     value={formData.date}
                     onChange={handleChange}
+                    min={new Date().toISOString().split('T')[0]}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label htmlFor="time" className="block text-gray-700 mb-1">Time</label>
+                  <label htmlFor="time" className="block text-gray-700 mb-1">
+                    {translations.contact.form.time[language]} *
+                  </label>
                   <select
                     id="time"
                     value={formData.time}
@@ -149,8 +255,8 @@ const ContactSection: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
                     required
                   >
-                    <option value="">Select time</option>
-                    {['12:00', '13:00', '14:00', '18:00', '19:00', '20:00', '21:00'].map(time => (
+                    <option value="">{language === 'en' ? 'Select time' : 'Zeit auswählen'}</option>
+                    {['12:00', '12:30', '13:00', '13:30', '14:00', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'].map(time => (
                       <option key={time} value={time}>{time}</option>
                     ))}
                   </select>
@@ -158,7 +264,9 @@ const ContactSection: React.FC = () => {
               </div>
               
               <div>
-                <label htmlFor="guests" className="block text-gray-700 mb-1">Number of Guests</label>
+                <label htmlFor="guests" className="block text-gray-700 mb-1">
+                  {translations.contact.form.guests[language]} *
+                </label>
                 <select
                   id="guests"
                   value={formData.guests}
@@ -166,32 +274,40 @@ const ContactSection: React.FC = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
                   required
                 >
-                  {[1, 2, 3, 4, 5, 6].map(num => (
-                    <option key={num} value={num}>{num} {num === 1 ? 'person' : 'people'}</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                    <option key={num} value={num}>
+                      {num} {num === 1 ? (language === 'en' ? 'person' : 'Person') : (language === 'en' ? 'people' : 'Personen')}
+                    </option>
                   ))}
-                  <option value="7">6+ people</option>
+                  <option value="9">{language === 'en' ? '9+ people' : '9+ Personen'}</option>
                 </select>
               </div>
               
               <div>
-                <label htmlFor="message" className="block text-gray-700 mb-1">Special Requests</label>
+                <label htmlFor="message" className="block text-gray-700 mb-1">
+                  {translations.contact.form.message[language]}
+                </label>
                 <textarea
                   id="message"
                   value={formData.message}
                   onChange={handleChange}
                   rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-                  placeholder="Any special requests or dietary requirements?"
+                  placeholder={language === 'en' ? 'Any special requests or dietary requirements?' : 'Besondere Wünsche oder Ernährungsanforderungen?'}
                 ></textarea>
               </div>
               
               <motion.button
                 type="submit"
-                className="w-full btn-primary"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                disabled={loading}
+                className={`w-full btn-primary ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                whileHover={!loading ? { scale: 1.02 } : {}}
+                whileTap={!loading ? { scale: 0.98 } : {}}
               >
-                Book Now
+                {loading 
+                  ? (language === 'en' ? 'Submitting...' : 'Wird übermittelt...') 
+                  : translations.contact.form.submit[language]
+                }
               </motion.button>
             </form>
           </motion.div>
@@ -202,7 +318,9 @@ const ContactSection: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="bg-white/95 backdrop-blur p-8 rounded-lg shadow-xl"
           >
-            <h3 className="font-display text-2xl mb-8 text-gray-900">Get in Touch</h3>
+            <h3 className="font-display text-2xl mb-8 text-gray-900">
+              {language === 'en' ? 'Get in Touch' : 'Kontaktieren Sie uns'}
+            </h3>
             
             <div className="space-y-8">
               {contactInfo.map((info, index) => (
@@ -231,7 +349,9 @@ const ContactSection: React.FC = () => {
               transition={{ duration: 0.8, delay: 0.4 }}
               className="mt-8"
             >
-              <h4 className="font-medium text-gray-900 mb-4">Find Us</h4>
+              <h4 className="font-medium text-gray-900 mb-4">
+                {language === 'en' ? 'Find Us' : 'Finden Sie uns'}
+              </h4>
               <div className="h-[200px] rounded-lg overflow-hidden">
                 <iframe 
                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2682.023456696236!2d8.836444776165843!3d47.76159937120448!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x479a7d35eeee6f1f%3A0xe5111ed81e27db8c!2sBay%20Leaf!5e0!3m2!1sen!2sin!4v1748797783448!5m2!1sen!2sin"
@@ -261,7 +381,9 @@ const ContactSection: React.FC = () => {
           duration={800}
           className="text-white/80 flex flex-col items-center cursor-pointer hover:text-white transition-colors"
         >
-          <span className="text-sm uppercase tracking-wider mb-2">Follow Us</span>
+          <span className="text-sm uppercase tracking-wider mb-2">
+            {language === 'en' ? 'Follow Us' : 'Folgen Sie uns'}
+          </span>
           <div className="flex space-x-4">
             <div className="w-2 h-2 bg-white rounded-full"></div>
             <div className="w-2 h-2 bg-white rounded-full"></div>
